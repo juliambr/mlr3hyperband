@@ -47,6 +47,13 @@
 #'   Object defining how the samples of the parameter space should be drawn
 #'   during the initialization of each bracket. The default is uniform sampling.
 #'
+#' * `n.objectives` :: `integer(1)`\cr 
+#'   Number of objectives that are taken into account into optimization. 
+#'   If `n.objectives` is smaller than the number of objectives specified in the 
+#'   tuning instance, only the first `n.objectives` are taken account into optimization,
+#'   whereas the others are only measured. The default is optimizing with regards 
+#'   to all measures specified in the tuning instance.
+#' 
 #' @section Fields:
 #' * `info` :: [data.table::data.table()]\cr
 #'   Table containing information about the intermediate values, matching the
@@ -311,7 +318,7 @@ TunerHyperband = R6Class("TunerHyperband",
     info = NULL,
 
     # create hyperband parameters and init super class (Tuner)
-    initialize = function(eta = 2, sampler = NULL) {
+    initialize = function(eta = 2, sampler = NULL, n.objectives = NULL) {
 
       # class wide lower bound of eta (since eta >1)
       lowest_eta = 1.0001
@@ -322,10 +329,14 @@ TunerHyperband = R6Class("TunerHyperband",
       ps_hyperband = ParamSet$new(list(
         ParamDbl$new("eta", lower = lowest_eta, tags = "required"),
         ParamUty$new("sampler",
-          custom_check = function(x) check_r6(x, "Sampler", null.ok = TRUE))
+          custom_check = function(x) check_r6(x, "Sampler", null.ok = TRUE)),
+        ParamInt$new("n.objectives", lower = 1L)
       ))
 
       ps_hyperband$values = list(eta = eta, sampler = sampler)
+
+      if (!is.null(n.objectives))
+        ps_hyperband$values = c(ps_hyperband$values, n.objectives = n.objectives)
 
       super$initialize(
         param_classes = c("ParamLgl", "ParamInt", "ParamDbl", "ParamFct"),
@@ -342,11 +353,18 @@ TunerHyperband = R6Class("TunerHyperband",
       # define aliases for better readability
       eta = self$param_set$values$eta
       sampler = self$param_set$values$sampler
+
       rr = instance$resampling
       ps = instance$param_set
       task = instance$task
       msr_ids = ids(instance$measures)
-      to_minimize = map_lgl(instance$measures, "minimize")
+
+      # ids we want to optimize for 
+      n.objectives = self$param_set$values$n.objectives %??% length(msr_ids)
+      n.objectives = min(n.objectives, length(msr_ids))
+
+      opt_ids = msr_ids[1:n.objectives]
+      to_minimize = map_lgl(instance$measures, "minimize")[1:n.objectives]
 
       # name of the hyperparameters with a budget tag
       budget_id = instance$param_set$ids(tags = "budget")
@@ -452,11 +470,11 @@ TunerHyperband = R6Class("TunerHyperband",
             configs_perf = configs_perf[(n_rows - mu_previous + 1):n_rows]
 
             # select best mu_current indices
-            if (length(msr_ids) < 2) {
+            if (length(opt_ids) < 2) {
 
               # single crit
               ordered_perf = order(
-                configs_perf[[msr_ids]],
+                configs_perf[[opt_ids]],
                 decreasing = !to_minimize
               )
               best_indices = ordered_perf[seq_len(mu_current)]
@@ -465,7 +483,7 @@ TunerHyperband = R6Class("TunerHyperband",
 
               # multi crit
               best_indices = nds_selection(
-                points = t(as.matrix(configs_perf[, msr_ids, with = FALSE])),
+                points = t(as.matrix(configs_perf[, opt_ids, with = FALSE])),
                 n_select = mu_current,
                 minimize = to_minimize
               )

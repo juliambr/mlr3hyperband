@@ -13,6 +13,8 @@ test_that("TunerHyperband singlecrit", {
 })
 
 
+
+
 test_that("TunerHyperband multicrit", {
   set.seed(1234)
   test_tuner("hyperband", eta = 3L, lower_b = 1, upper_b = 27, measures = c("classif.fpr", "classif.tpr"))
@@ -47,6 +49,43 @@ test_that("TunerHyperband multicrit", {
   expect_data_table(results, ncols = 4, nrows = 7)
 })
 
+test_that("TunerHyperband singlecrit with measurables", {
+  set.seed(1234)
+
+  params = list(
+    ParamDbl$new("cp", lower = 0.001, upper = 0.1),
+    ParamInt$new("minsplit", lower = 1L, upper = 4L, tags = "budget")
+  )
+
+  inst = TuningInstance$new(
+    tsk("pima"),
+    lrn("classif.rpart"),
+    rsmp("holdout"),
+    lapply(c("classif.fpr", "debug"), msr),
+    ParamSet$new(params),
+    term("evals", n_evals = 100000)
+  )
+
+  tuner = TunerHyperband$new(eta = 4L, n.objectives = 2L)
+  expect_tuner(tuner)
+  # does not work when it considers both objectives
+  # because msr("debug")$minimize = NA 
+  expect_error(tuner$tune(inst))
+
+  tuner = TunerHyperband$new(eta = 4L, n.objectives = 1L)
+  # if we only consider the first objective, it works 
+  tuner$tune(inst)
+  
+  # check if still both measures are recorded
+  results = inst$archive()[, .(
+    cp = sapply(params, "[", "cp"),
+    minsplit = sapply(params, "[", "minsplit"),
+    classif.fpr,
+    debug
+  )]
+
+  expect_data_table(results, ncols = 4)
+})
 
 test_that("TunerHyperband using CV", {
   set.seed(123)

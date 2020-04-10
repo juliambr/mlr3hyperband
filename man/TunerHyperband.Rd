@@ -91,6 +91,12 @@ values are supported, but \code{eta} is not allowed to be less or equal 1.
 \item \code{sampler} :: \link[R6:R6Class]{R6::R6Class} object inheriting from \link[paradox:Sampler]{paradox::Sampler}\cr
 Object defining how the samples of the parameter space should be drawn
 during the initialization of each bracket. The default is uniform sampling.
+\item \code{n.objectives} :: \code{integer(1)}\cr
+Number of objectives that are taken into account into optimization.
+If \code{n.objectives} is smaller than the number of objectives specified in the
+tuning instance, only the first \code{n.objectives} are taken account into optimization,
+whereas the others are only measured. The default is optimizing with regards
+to all measures specified in the tuning instance.
 }
 }
 
@@ -341,7 +347,7 @@ print(tuner$info)
 \if{latex}{\out{\hypertarget{method-new}{}}}
 \subsection{Method \code{new()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{TunerHyperband$new(eta = 2, sampler = NULL)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{TunerHyperband$new(eta = 2, sampler = NULL, n.objectives = NULL)}\if{html}{\out{</div>}}
 }
 
 }
