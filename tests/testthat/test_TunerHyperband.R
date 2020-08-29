@@ -4,7 +4,6 @@ library(checkmate)
 
 context("TunerHyperband")
 
-
 test_that("TunerHyperband singlecrit", {
   set.seed(1234)
   test_tuner_hyperband(eta = 3L, lower_b = 1, upper_b = 27)
@@ -289,4 +288,54 @@ test_that("TunerHyperband invalid input", {
     tuner$optimize(inst),
     "Exactly one hyperparameter must be tagged with 'budget'"
   )
+})
+
+
+
+test_that("TunerHyperband on a synthetic function", {
+  set.seed(123)
+
+  fun = function(xs) {
+    # Normal noise with 1 / budget_param is added on top of evaluation
+    # the higher the budget_param, the higher the fidelity 
+    sigma = 1 / xs[[2]]
+    xs[[1]]^2 + rnorm(1, 0, sigma)
+  }
+
+  # Set domain
+  domain = ParamSet$new(list(
+    ParamDbl$new("x1", - 3, 3),
+    ParamDbl$new("x2", 1, 8, tag = "budget")
+  ))
+
+  # Set codomain
+  codomain = ParamSet$new(list(
+    ParamDbl$new("y", tags = "minimize")
+  ))
+
+  obj = ObjectiveRFun$new(
+        fun = fun,
+        domain = domain,
+        codomain = codomain, 
+        properties = "noisy"
+      ) 
+
+  # Hyperband should terminate on its own 
+  terminator = trm("evals", n_evals = 1000000)
+
+  # Create optimization instance
+  instance = OptimInstanceSingleCrit$new(
+    objective = obj, 
+    search_space = domain,
+    terminator = terminator
+    )
+
+  tuner = tnr("hyperband", eta = 2L)
+
+  tuner$optimize(instance)
+
+  brackets = hyperband_brackets(R = 8, eta = 2)
+  n_configs = sum(brackets$n_configs)
+
+  expect_data_table(instance$archive$data(), nrows = n_configs)
 })

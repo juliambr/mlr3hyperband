@@ -319,6 +319,11 @@ TunerHyperband = R6Class("TunerHyperband",
         properties = c("dependencies", "single-crit", "multi-crit"),
         packages = "emoa" # used in nds_selection()
       )
+    }, 
+    # hyperband can also be used as a simple optimizer on a OptimInstance
+   optimize = function(inst) {
+      assert_multi_class(inst, c("OptimInstanceMultiCrit", "OptimInstanceSingleCrit", "TuningInstanceSingleCrit", "TuningInstanceMultiCrit"))
+      optimize_default(inst, self, private)
     }
   ),
 
@@ -330,10 +335,17 @@ TunerHyperband = R6Class("TunerHyperband",
       eta = self$param_set$values$eta
       sampler = self$param_set$values$sampler
       ps = inst$search_space
-      task = inst$objective$task
-      measures = inst$objective$measures
-      msr_ids = ids(measures)
-      to_minimize = map_lgl(measures, "minimize")
+
+      # if we optimize over an OptimInstance, there is no task, measure, etc.
+      if (test_multi_class(inst, c("TuningInstanceSingleCrit", "TuningInstanceMultiCrit"))) {
+        task = inst$objective$task
+        measures = inst$objective$measures
+        msr_ids = ids(measures)
+        to_minimize = map_lgl(measures, "minimize")
+      } else {
+        msr_ids = inst$objective$codomain$ids()
+        to_minimize = map_lgl(inst$objective$codomain$tags, function(x) x == "minimize")
+      }
 
       # name of the hyperparameters with a budget tag
       budget_id = ps$ids(tags = "budget")
@@ -486,6 +498,10 @@ TunerHyperband = R6Class("TunerHyperband",
         # sum(self$info$n_configs),
         # sum(self$info$budget_real * self$info$n_configs)
       )
+    }, 
+    .assign_result = function(inst) {
+      assert_multi_class(inst, c("OptimInstanceMultiCrit", "OptimInstanceSingleCrit", "TuningInstanceSingleCrit", "TuningInstanceMultiCrit"))
+      assign_result_default(inst) 
     }
   )
 )
