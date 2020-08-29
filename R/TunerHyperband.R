@@ -329,7 +329,6 @@ TunerHyperband = R6Class("TunerHyperband",
       # define aliases for better readability
       eta = self$param_set$values$eta
       sampler = self$param_set$values$sampler
-      rr = inst$objective$resampling
       ps = inst$search_space
       task = inst$objective$task
       measures = inst$objective$measures
