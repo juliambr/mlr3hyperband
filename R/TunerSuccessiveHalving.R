@@ -83,7 +83,7 @@ TunerSuccessiveHalving = R6Class("TunerSuccessiveHalving",
 
       # Number of stages so that the last stages evaluates more than 1
       # configuration
-      k_n = floor(log(n / size_front, eta))
+      k_n = floor(log(n / reduce_to, eta))
 
       # The number of halvings we can perform 
       k = min(k_n, k_r)
