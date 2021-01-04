@@ -105,7 +105,7 @@ TunerSuccessiveHalving = R6Class("TunerSuccessiveHalving",
           ni = ceiling(n * eta^(-i))
           ri = r_min * eta^i 
 
-          if (s == 0) {
+          if (i == 0) {
             xdt = sampler$sample(ni)$data
             xdt$continue_hash = seq(nrow(xdt))
           } else {
