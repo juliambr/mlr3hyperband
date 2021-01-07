@@ -49,7 +49,11 @@ select_survivors = function(points, n_select, ref_point = NULL, minimize = TRUE,
   if (!is.null(ref_point)) {
     ref_point = ref_point * (minimize * 2 - 1)
   } else {
-    ref_point = apply(points, 2, max)
+    if(method == "indicator_based" & !is.null(archive)){
+      ref_point = apply(rbind(archive,points), 2, max)
+    }else{
+      ref_point = apply(points, 2, max)
+    }
   }
 
   # init output indices
@@ -143,12 +147,10 @@ select_survivors = function(points, n_select, ref_point = NULL, minimize = TRUE,
         break
       }
       if(cur_arch_size == 0){
-        sel_surv = c(sel_surv, setdiff(seq_row(points), sel_surv))
+        sel_surv = c(sel_surv, setdiff(seq_row(points), sel_surv))[seq_len(n_select)]
       }
 
       }
-
-    sel_surv = sel_surv[seq_len(n_select)]
   }
 
   return(sel_surv)

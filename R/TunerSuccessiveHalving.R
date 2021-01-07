@@ -6,7 +6,10 @@ TunerSuccessiveHalving = R6Class("TunerSuccessiveHalving",
   inherit = Tuner,
   public = list(
 
+    hist = NULL,
     mo_archive = NULL,
+    ind_archive = NULL,
+    design = NULL,
 
     #' @description
     #' Creates a new instance of this [R6][R6::R6Class] class.
@@ -20,7 +23,9 @@ TunerSuccessiveHalving = R6Class("TunerSuccessiveHalving",
         ParamDbl$new("r", lower = 1e-8), # TODO: Check if boundaries are correct
         ParamFct$new("mo_method", levels = c("indicator_based", "dominance_based", "scalarized"), default = "dominance_based"),
         ParamFct$new("tie_breaker", levels = c("CD", "HV"), default = "CD"),
-        ParamInt$new("np", lower = 1L)
+        ParamInt$new("np", lower = 1L),
+        ParamUty$new("ref_point",
+          custom_check = function(x) check_numeric(x, null.ok = TRUE))
       ))
 
       ps$values = list(eta = 2, sampler = NULL)
@@ -54,6 +59,7 @@ TunerSuccessiveHalving = R6Class("TunerSuccessiveHalving",
       assert_character(budget_id, len = 1)
 
       self$mo_archive = NULL
+      ref_point = pars$ref_point
 
       mo_method = pars$mo_method
       tie_breaker = pars$tie_breaker
@@ -95,9 +101,9 @@ TunerSuccessiveHalving = R6Class("TunerSuccessiveHalving",
 
       lg$info("Performing Successive Halving with a total budget of %g.", B)
 
-      design = data.table(n = floor(n * eta^(- seq(0, k))), r = r_min * eta^seq(0, k))
+      self$design = data.table(n = floor(n * eta^(- seq(0, k))), r = r_min * eta^seq(0, k))
       print("Design of the bracket:")
-      print(design)
+      print(self$design)
 
       mo_archive = NULL
 
@@ -122,7 +128,8 @@ TunerSuccessiveHalving = R6Class("TunerSuccessiveHalving",
             } else {
               row_ids = select_survivors(points = y, n_select = ni,
                 minimize = minimize, method = mo_method, tie_breaker = tie_breaker,
-                archive = self$mo_archive[, inst$objective$codomain$ids(), with = FALSE])
+                archive = self$mo_archive[, inst$objective$codomain$ids(), with = FALSE],
+                ref_point = ref_point)
             }
             xdt = data[row_ids, c(archive$cols_x, "continue_hash"), with = FALSE]
           }
@@ -139,6 +146,28 @@ TunerSuccessiveHalving = R6Class("TunerSuccessiveHalving",
         } else {
           self$mo_archive = rbind(self$mo_archive, inst$archive$data[stage == i + 1 & outer_stage == o, ])
           self$mo_archive = undominated(self$mo_archive, inst$objective$codomain$ids())
+        }
+
+        # todo: logging flag
+        if(mo_method == "indicator_based"){
+          cur_ref_point = ref_point
+          if(is.null(cur_ref_point)){
+            cur_ref_point = apply(
+              self$mo_archive[, inst$objective$codomain$ids(), with = FALSE],
+              2,
+              max)
+          }
+          dt = data.table(
+            B = B*o/outer_iters,
+            hv = emoa::dominated_hypervolume(t(data.matrix(
+              self$mo_archive[, inst$objective$codomain$ids(), with = FALSE])),
+              cur_ref_point))
+
+          if(is.null(self$ind_archive)){
+            self$ind_archive = dt
+          }else{
+            self$ind_archive = rbind(self$ind_archive, dt)
+          }
         }
       }
     },
