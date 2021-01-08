@@ -153,7 +153,7 @@ TunerSuccessiveHalving = R6Class("TunerSuccessiveHalving",
         }
 
         # todo: logging flag
-        if(archive$codomain$length > 1 && mo_method == "indicator_based"){
+        if(inst$archive$codomain$length > 1 && mo_method == "indicator_based"){
           cur_ref_point = ref_point
           if(is.null(cur_ref_point)){
             cur_ref_point = apply(
