@@ -142,7 +142,8 @@ TunerSuccessiveHalving = R6Class("TunerSuccessiveHalving",
 
         if (is.null(self$mo_archive)) {
           self$mo_archive = inst$archive$data[stage == i + 1 & outer_stage == o, ]
-          self$mo_archive = undominated(self$mo_archive, inst$objective$codomain$ids())
+          if(nrow(self$mo_archive) > 1)
+            self$mo_archive = undominated(self$mo_archive, inst$objective$codomain$ids())
         } else {
           self$mo_archive = rbind(self$mo_archive, inst$archive$data[stage == i + 1 & outer_stage == o, ])
           self$mo_archive = undominated(self$mo_archive, inst$objective$codomain$ids())
