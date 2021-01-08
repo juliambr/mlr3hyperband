@@ -80,9 +80,13 @@ TunerSuccessiveHalving = R6Class("TunerSuccessiveHalving",
       # Budget needs to be numeric
       assert_choice(ps$class[[budget_id]], c("ParamInt", "ParamDbl"))
 
-
-      outer_iters = ifelse(mo_method == "dominance_based", 1L, np)
-      reduce_to = ifelse(mo_method == "dominance_based", np, 1L)
+      if (inst$archive$codomain$length == 1L) {
+        outer_iters = 1L
+        reduce_to = 1L
+      } else {
+        outer_iters = ifelse(mo_method == "dominance_based", 1L, np)
+        reduce_to = ifelse(mo_method == "dominance_based", np, 1L)
+      }
 
       # Number of stages if each configuration in the fist stage uses r_min
       # resources and each configuration in the last stage uses not more than
@@ -149,7 +153,7 @@ TunerSuccessiveHalving = R6Class("TunerSuccessiveHalving",
         }
 
         # todo: logging flag
-        if(mo_method == "indicator_based"){
+        if(archive$codomain$length > 1 && mo_method == "indicator_based"){
           cur_ref_point = ref_point
           if(is.null(cur_ref_point)){
             cur_ref_point = apply(

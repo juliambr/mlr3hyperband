@@ -65,7 +65,7 @@ RoxygenNote: 7.1.1
 Collate:
     'TunerHyperband.R'
     'TunerSuccessiveHalving.R'
-    'nds_selection.R'
+    'select_survivors.R'
     'ind_bas_sel.R'
     'bibentries.R'
     'zzz.R'

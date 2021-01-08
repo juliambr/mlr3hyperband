@@ -22,7 +22,7 @@
 select_survivors = function(points, n_select, ref_point = NULL, minimize = TRUE,
   method = "dominance_based", tie_breaker = "HV", archive = NULL) {
 
-  require_namespaces("emoa")
+  requireNamespace("emoa")
 
   # check input for correctness
   assert_data_frame(points)
@@ -79,23 +79,18 @@ select_survivors = function(points, n_select, ref_point = NULL, minimize = TRUE,
 
       if (tie_breaker == "HV") {
 
-        while(length(sel_surv) + length(tie_idx) > n_select) {
+        pointsm = t(as.matrix(points))
 
-          # I am not trusting emoa here; empirically it brought strange results
-          hv_contrib = eaf::hv_contributions(data = t(tie_points), ref = ref_point, maximise = FALSE)
+        # Compute all subsets of size n_select - length(sel_surv)
+        n_tie_surv = n_select - length(sel_surv)
+        subsets = combn(tie_idx, n_tie_surv, simplify = FALSE)
 
-          # index of the tied case with the lowest hypervolume contribution
-          to_remove = which(hv_contrib == min(hv_contrib))
+        hvs = lapply(subsets, function(s) {
+          emoa::dominated_hypervolume(pointsm[, s, drop = FALSE], ref = ref_point)
+        })
 
-          # if two points have the exact same hypervolume contribution, the point is sampled
-          if (length(to_remove) > 1)
-            to_remove = sample(to_remove, 1)
+        sel_surv = c(sel_surv, subsets[[which.max(unlist(hvs))]])
 
-          tie_points = tie_points[, - to_remove, drop = FALSE]
-          tie_idx = tie_idx[- to_remove]
-        }
-
-        sel_surv = c(sel_surv, tie_idx)
       }
     }
   }

@@ -4,17 +4,60 @@ library(checkmate)
 
 context("TunerSuccessiveHalving")
 
-
-test_that("TunerHyperband singlecrit", {
-
-	# Remove later
-	mlr_tuners$add("sh", TunerSuccessiveHalving)	
+test_that("TunerSuccessiveHalving singlecrit", {
 
 	par.set = ParamSet$new(params = list(
-		ParamInt$new("nrounds", lower = 20, upper = 2^8,
+		ParamInt$new("nrounds", lower = 2, upper = 2^3,
 		  tags = "budget"),
 		ParamInt$new("max_depth", lower = 1, upper = 100)
 	))
+
+	task = tsk("pima")
+
+	learner = lrn("classif.xgboost")
+
+	term = trm("none")
+
+    inst = TuningInstanceSingleCrit$new(task = task, learner = learner,
+      resampling =  rsmp("holdout"), measure = msr("classif.acc"), terminator = term,
+      search_space = par.set)
+
+    # If we do not specify r, then it is computed from the parameter set 
+    tuner = mlr3tuning::tnr("sh", eta = 2, n = 24)
+    # given lower = 2 and upper = 2^4 we have 4 stages 
+    tuner$optimize(inst)
+    archive = inst$archive$data
+    # total budget should be 
+    expect_equal(sum(archive$nrounds), 3 * as.numeric(tuner$param_set$values$n * par.set$lower["nrounds"]))
+    expect_equal(as.numeric(table(archive$nrounds)), 24 / 2^(0:2))
+
+    # make sure that the best value survives 
+    expect_true(archive[stage == 1, ][, .SD[which.max(classif.acc)], ]$max_depth %in% archive[stage == 2, ]$max_depth)
+
+    # If we r is higher then the minimum budget, the number of successive halvings should reduce
+    inst = TuningInstanceSingleCrit$new(task = task, learner = learner,
+      resampling =  rsmp("holdout"), measure = msr("classif.acc"), terminator = term,
+      search_space = par.set)
+
+    tuner = mlr3tuning::tnr("sh", eta = 2, n = 24, r = 4)
+    tuner$optimize(inst)
+    archive = inst$archive$data
+    # total budget should be 
+    expect_equal(sum(archive$nrounds), 2 * as.numeric(tuner$param_set$values$n * 4))
+
+    tuner = mlr3tuning::tnr("sh", eta = 2, n = 24, r = 2^4 + 1)
+    expect_error(tuner$optimize(inst))
+})
+
+
+test_that("TunerSuccessiveHalving multicrit", {
+
+	par.set = ParamSet$new(params = list(
+		ParamInt$new("nrounds", lower = 2, upper = 2^3,
+		  tags = "budget"),
+		ParamInt$new("max_depth", lower = 1, upper = 100)
+	))
+
 	task = tsk("pima")
 
 	learner = lrn("classif.xgboost")
@@ -27,7 +70,58 @@ test_that("TunerHyperband singlecrit", {
       resampling =  rsmp("holdout"), measure = msrs(measures), terminator = term,
       search_space = par.set)
 
-    tuner = mlr3tuning::tnr("sh", eta = 2, n = 2^5, r = 20, mo_method = "indicator_based", np = 2, tie_breaker = "CD")
+    # check if the indicator-based method works
+    tuner = mlr3tuning::tnr("sh", eta = 2, n = 24, mo_method = "indicator_based", np = 3)
+
+    # expect a total budget of np * nstages = n * r = 3 * 3 * 24 * 2
+    tuner$optimize(inst)
+    archive = inst$archive$data
+    expect_equal(sum(archive$nrounds), 3 * 3 * 24 * 2)
+
+    inst = TuningInstanceMultiCrit$new(task = task, learner = learner,
+      resampling =  rsmp("holdout"), measure = msrs(measures), terminator = term,
+      search_space = par.set)
+
+    # check if the indicator-based method works
+    tuner = mlr3tuning::tnr("sh", eta = 2, n = 24, mo_method = "dominance_based", np = 8, tie_breaker = "CD")
+
+    # We only can do two iterations instead of 3 if we want to reduce down to 8
+    tuner$optimize(inst)
+    archive = inst$archive$data
+    expect_equal(sum(archive$nrounds), 2 * 24 * 2)
+
+    inst = TuningInstanceMultiCrit$new(task = task, learner = learner,
+      resampling =  rsmp("holdout"), measure = msrs(measures), terminator = term,
+      search_space = par.set)
+
+    tuner = mlr3tuning::tnr("sh", eta = 2, n = 24, mo_method = "dominance_based", np = 8, tie_breaker = "HV")
+    expect_success(tuner$optimize(inst))
+})
+
+
+test_that("TunerSuccessiveHalving singlecrit", {
+
+	par.set = ParamSet$new(params = list(
+		ParamInt$new("nrounds", lower = 2, upper = 2^5,
+		  tags = "budget"),
+		ParamInt$new("max_depth", lower = 1, upper = 100)
+	))
+
+	task = tsk("pima")
+
+	learner = lrn("classif.xgboost")
+
+	term = trm("none")
+
+    measures = c("classif.tpr", "classif.fpr")
+
+    inst = TuningInstanceMultiCrit$new(task = task, learner = learner,
+      resampling =  rsmp("holdout"), measure = msrs(measures), terminator = term,
+      search_space = par.set)
+
+
+
+    tuner = mlr3tuning::tnr("sh", eta = 2, n = 2^5, r = 2^6, mo_method = "indicator_based", np = 2, tie_breaker = "CD")
 
     tuner$optimize(inst)
 
@@ -36,7 +130,7 @@ test_that("TunerHyperband singlecrit", {
       resampling =  rsmp("holdout"), measure = msrs(measures), terminator = term,
       search_space = par.set)
 
-    tuner = mlr3tuning::tnr("sh", eta = 2, n = 2^5, r = 20, mo_method = "dominance_based", np = 1, tie_breaker = "CD")
+    tuner = mlr3tuning::tnr("sh", eta = 2, n = 2^5, r = 20, mo_method = "dominance_based", np = 1, tie_breaker = "HV")
 
     tuner$optimize(inst)
 })
